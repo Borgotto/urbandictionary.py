@@ -125,6 +125,7 @@ class UrbanDictionary():
         self.wordIndex = 0
         self.pageIndex += 1
         self.words = self.pages.get(self.pageIndex) or getWordsFromUrl(self.url)
+        return self.words
 
     def goToNextWord(self):
         if not self.hasNextWord:
