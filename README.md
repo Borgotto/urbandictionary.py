@@ -2,8 +2,9 @@
 A web scraper written in Python to extract words from https://www.urbandictionary.com/
 
 ### Requirements:
-- [Python 3.8.8](https://www.python.org/downloads/) (or newer)
-- [BeautifulSoup 4.9](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-beautiful-soup) (or newer)
+- [Python 3.8](https://www.python.org/downloads/)
+- [BeautifulSoup 4](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-beautiful-soup)
+- [lxml](https://lxml.de/installation.html)
 - [PySimpleGUI](https://pysimplegui.readthedocs.io/en/latest/#install) (optional, if you don't want to use main.py)
 
 `cd` to the repo folder and install via `pip install -r requirements.txt` command
