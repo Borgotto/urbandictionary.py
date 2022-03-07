@@ -11,7 +11,7 @@ A web scraper written in Python to extract words from https://www.urbandictionar
 ### Features:
 - pretty much everything you can do through the website but without graphical interface <br />
   (except for user-related stuff like login, vote or submit new definitions)
-  
+
 |              Feature              |                    State                    |
 |-----------------------------------|:-------------------------------------------:|
 | get words from the main page      | <span title="Implemented">✔️</span>        |
@@ -29,41 +29,45 @@ from urban_dictionary import UrbanDictionary
 
 ud = UrbanDictionary()
 
-word_of_the_day = ud.currentWord
+# Simply get the words from the main page
+ud = UrbanDictionary()
+
+word_of_the_day = ud.current_word
 print("Today's WOTD is", word_of_the_day.get("name"))
 
-if ud.hasNextWord:
-    ud.goToNextWord()
-    print("Yesterday's WOTD was", ud.currentWord.get("name"))
+if ud.has_next_word:
+    word = ud.go_to_next_word()
+    print("Yesterday's WOTD was", word.get("name"))
 
-if ud.hasNextPage:
-    ud.goToNextPage()
-    print("Last week's WOTD was", ud.currentWord.get("name"))
+if ud.has_next_page:
+    ud.go_to_next_page()
+    print("Last week's WOTD was", ud.current_word.get("name"))
 ```
 - #### search for specific words
 ```python
-from urban_dictionary import UrbanDictionary
-
 ud = UrbanDictionary("meaning of life")
 
-#be sure to check that there's actually a definition for that word
-if ud.currentWord is None:
+# Be sure to check that there's actually a definition for that word
+if ud.current_word is None:
     print("no definition")
 else:
-    print("Top definition for 'meaning of life' is: \n" + ud.currentWord.get("meaning"))
+    print("Top definition for 'meaning of life' is:\n" +
+          ud.current_word.get("meaning"))
 ```
 - #### you can also get random words
 ```python
-from urban_dictionary import UrbanDictionary
-
 ud = UrbanDictionary(random=True)
 
-#there's always going to be a word to get, no checks needed
-print("Feeling lucky? Here's a random word: \n" + ud.currentWord.get("name") + "\n\n" + ud.currentWord.get("example"))
+# There's always going to be a word to get, no checks needed
+print("Feeling lucky? Here's a random word:\n" +
+      ud.current_word.get("name") + "\n" +
+      ud.current_word.get("example"))
 
-#let's get another random page full of random words
-ud.goToPreviousPage()
-print("\n\nAnother random word: \n" + ud.currentWord.get("name") + "\n\n" + ud.currentWord.get("example"))
+# Let's get another random page full of random words
+ud.go_to_previous_page()
+print("\n\nAnother random word:\n" +
+      ud.current_word.get("name") + "\n" +
+      ud.current_word.get("example"))
 ```
 
 ###### please, please, please send feedback
