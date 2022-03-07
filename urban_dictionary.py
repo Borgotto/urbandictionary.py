@@ -13,6 +13,7 @@ import requests
 import urllib.parse
 
 from bs4 import BeautifulSoup, element
+import lxml
 
 
 def _escape_markdown(text: str):
@@ -53,7 +54,7 @@ def get_words_from_url(url: str, markdown: bool = False):
 
     # Fetch all of the html divs containing the words definitions
     response = requests.get(url)
-    soup = BeautifulSoup(response.content, "html.parser")
+    soup = BeautifulSoup(response.content, "lxml")
     divs = soup.findAll("div", class_="definition")
 
     # For each div extract the informations and put it in the list
