@@ -52,8 +52,14 @@ def get_words_from_url(url: str, markdown: bool = False):
        valid url from https://www.urbandictionary.com/ domain
     """
 
+    # Static Session object
+    try:
+        session = get_words_from_url.session
+    except AttributeError:
+        session = get_words_from_url.session = requests.Session()
+
     # Fetch all of the html divs containing the words definitions
-    response = requests.get(url)
+    response = session.get(url)
     soup = BeautifulSoup(response.content, "lxml")
     divs = soup.findAll("div", class_="definition")
 
