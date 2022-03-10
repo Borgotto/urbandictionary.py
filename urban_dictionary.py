@@ -27,7 +27,7 @@ def _escape_markdown(text: str):
 def get_string_from_div(div: element.Tag, markdown: bool = False):
     """Utility function to extract a string from 'definition' divs.
 
-    Attributes
+    Arguments
     -------------
     div: `element.Tag`
         an html div from urbandictionary.com
@@ -67,7 +67,7 @@ def get_words_from_url(url: str, markdown: bool = False):
     """Utility function to extract the words from any valid url from the
     urbandictionary.com domain
 
-    Attributes
+    Arguments
     -------------
     url: `str`
         the full URL from urbandictionary.com
@@ -110,7 +110,7 @@ def get_words_from_url(url: str, markdown: bool = False):
         words.append(word)
     return words
 
-class Word():
+class Word:
     """
     A class describing a word definition from www.urbandictionary.com
     """
@@ -140,8 +140,8 @@ class Word():
             return False
 
 
-class UrbanDictionary():
-    """A class to handle queries on www.urbandictionary.com"""
+class UrbanDictionary:
+    """A class to handle queries on https://www.urbandictionary.com/"""
 
     def __init__(
                 self,
@@ -149,40 +149,65 @@ class UrbanDictionary():
                 random: bool = False,
                 markdown: bool = False,
                 caching: bool = True):
-        if query and query.strip():
-            self.query = urllib.parse.quote(query.strip())
-            self.random = False
-        else:
-            self.query = None
-            self.random = random
+        """
+        Arguments
+        -------------------------
+        query: `str`
+            represents the text searched on urbandictionary.com.
+            if None the site's homepage is queried
+
+        random: `bool`
+            if true random `Word`s will be queried
+
+        markdown: `bool`
+            if true `Word`s will be formatted to support markdown
+
+        caching: `bool`
+            if true `Word`s will be cached to save time and bandwidth
+        """
+        self.query = query.strip() if query and query.strip() else None
+        self.is_random = random if not self.query else False
         self.is_markdown = markdown
         self.is_caching = caching
         self.word_index = 0
         self.page_index = 1
-        self.page = get_words_from_url(self.url, self.is_markdown)
-        self.pages = {self.page_index: self.page} if self.is_caching else {}
+        self.pages: dict[int,list[Word]] = {}  # empty if not is_caching
 
     @property
     def url(self):
+        """
+        the current URL used to query from urbandictionary.com
+        e.g. https://www.urbandictionary.com/define.php?term=life
+        """
         url = "https://www.urbandictionary.com/"
         if self.query:
-            url += f"define.php?term={self.query}&"
-        elif self.random:
+            url += f"define.php?term={urllib.parse.quote(self.query)}&"
+        elif self.is_random:
             url += "random.php?"
         else:
             url += "?"
         return url + f"page={self.page_index}"
 
     @property
-    def current_word(self):
+    def word(self):
+        """Returns the current `Word` of the current page"""
         try:
             return self.page[self.word_index]
         except IndexError:
             return None
 
     @property
+    def page(self):
+        """Returns the current page (`list[Word]`)"""
+        page = (self.pages.get(self.page_index) or
+                get_words_from_url(self.url, self.is_markdown))
+        if self.is_caching:
+            self.pages[self.page_index] = page
+        return page
+
+    @property
     def has_previous_page(self):
-        return self.random or self.page_index > 1
+        return self.is_random or self.page_index > 1
 
     @property
     def has_previous_word(self):
@@ -191,28 +216,46 @@ class UrbanDictionary():
     @property
     def has_next_page(self):
         self.page_index += 1
-        words = (self.pages.get(self.page_index) or
-                 get_words_from_url(self.url, self.is_markdown))
-        if self.is_caching:
-            self.pages[self.page_index] = words
+        next_page = self.page
         self.page_index -= 1
-        return self.random or len(words) > 0
+        return self.is_random or len(next_page) > 0
 
     @property
     def has_next_word(self):
         return self.word_index < len(self.page)-1 or self.has_next_page
 
     def go_to_previous_page(self):
+        """
+        Move onto the first `Word` of the previous page.
+
+        Return value
+        -------------
+        The previous page (`list[Word]`) if present
+
+        Raises
+        -------------
+        `StopIteration` in case there isn't a previous page
+        """
         if not self.has_previous_page:
             raise StopIteration("There isn't a Page prior to the current one")
 
         self.word_index = 0
         self.page_index -= 1
-        self.page = (self.pages.get(self.page_index) or
-                     get_words_from_url(self.url, self.is_markdown))
         return self.page
 
     def go_to_previous_word(self):
+        """
+        Move onto the previous `Word` of the current page or last `Word`
+        of the previous page
+
+        Return value
+        -------------
+        The previous `Word` if present
+
+        Raises
+        -------------
+        `StopIteration` in case there isn't a previous word or page
+        """
         if not self.has_previous_word:
             raise StopIteration("There isn't a Word prior to the current one")
 
@@ -221,19 +264,40 @@ class UrbanDictionary():
         else:
             self.go_to_previous_page()
             self.word_index = len(self.page)-1
-        return self.current_word
+        return self.word
 
     def go_to_next_page(self):
+        """
+        Move onto the first `Word` of the next page.
+
+        Return value
+        -------------
+        The next page (`list[Word]`) if present
+
+        Raises
+        -------------
+        `StopIteration` in case there isn't a next page
+        """
         if not self.has_next_page:
             raise StopIteration("There isn't a Page after the current one")
 
         self.word_index = 0
         self.page_index += 1
-        self.page = (self.pages.get(self.page_index) or
-                     get_words_from_url(self.url, self.is_markdown))
         return self.page
 
     def go_to_next_word(self):
+        """
+        Move onto the next `Word` of the current page or first `Word` of
+        the next page
+
+        Return value
+        -------------
+        The next `Word` if present
+
+        Raises
+        -------------
+        `StopIteration` in case there isn't a next word or page
+        """
         if not self.has_next_word:
             raise StopIteration("There isn't a Word after the current one")
 
@@ -241,4 +305,4 @@ class UrbanDictionary():
             self.word_index += 1
         else:
             self.go_to_next_page()
-        return self.current_word
+        return self.word
