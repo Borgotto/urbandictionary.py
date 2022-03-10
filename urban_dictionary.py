@@ -5,7 +5,7 @@ soon™
 __author__ = "Emanuele Borghini"
 __version__ = "0.1"
 
-__all__ = ["UrbanDictionary", "get_words_from_url"]
+__all__ = ["UrbanDictionary", "Word", "get_words_from_url"]
 
 
 import re
@@ -18,38 +18,72 @@ import lxml
 
 def _escape_markdown(text: str):
     def replacement(match):
-        return match.groupdict().get("url") or "\\".join(match.groupdict()["markdown"])
+        return (match.groupdict().get("url") or
+                "\\".join(match.groupdict()["markdown"]))
     regex = r"(?P<markdown>[_\\~|\*`]|%s)" % r"^>(?:>>)?\s|\[.+\]\(.+\)"
     return re.sub(regex, replacement, text, 0, re.MULTILINE)
 
 
-def _get_string_from_div(div, markdown : bool = False):
-    """Utility function to extract a string from a div.
+def get_string_from_div(div: element.Tag, markdown: bool = False):
+    """Utility function to extract a string from 'definition' divs.
 
-        The string can be formatted using markdown,
-        this function is highly dependend from
-        https://www.urbandictionary.com/ html page
+    Attributes
+    -------------
+    div: `element.Tag`
+        an html div from urbandictionary.com
+
+    markdown: `bool`
+        whether to format the string to support markdown
+
+    Return value
+    -------------
+    A string containing the joined text of all elements inside the div
+
+    N.B.
+    -------------
+    this function is highly dependant from
+    https://www.urbandictionary.com/ html page
     """
-    string = ""
-    for html_elem in (content for content in div.contents):
-        if markdown:
-            text = _escape_markdown(html_elem.text)
-        else:
-            text = html_elem.text
 
-        if isinstance(html_elem, element.Tag) and html_elem.name == "br":
-            string += "\n"
-        elif isinstance(html_elem, element.Tag) and html_elem.name == "a" and markdown:
+    string = ""
+    for child in div.children:
+        if markdown:
+            text = _escape_markdown(child.text)
+        else:
+            text = child.text
+
+        if isinstance(child, element.Tag) and child.name == "a" and markdown:
             string += (f"[{text}]" +
-                       f"(https://www.urbandictionary.com{html_elem.attrs['href']})")
+                        "(https://www.urbandictionary.com" +
+                       f"{child.attrs['href']})")
+        elif isinstance(child, element.Tag) and child.name == "br":
+            string += "\n"
         else:
             string += text
     return string
 
 
 def get_words_from_url(url: str, markdown: bool = False):
-    """Function that returns a list containing the words from any
-       valid url from https://www.urbandictionary.com/ domain
+    """Utility function to extract the words from any valid url from the
+    urbandictionary.com domain
+
+    Attributes
+    -------------
+    url: `str`
+        the full URL from urbandictionary.com
+        e.g. https://www.urbandictionary.com/define.php?term=life
+
+    markdown: `bool`
+        whether to format the string to support markdown
+
+    Return value
+    -------------
+    A `list` containing the `Word` objects
+
+    N.B.
+    -------------
+    this function is highly dependant from
+    https://www.urbandictionary.com/ html page
     """
 
     # Static Session object
@@ -62,23 +96,55 @@ def get_words_from_url(url: str, markdown: bool = False):
     response = session.get(url)
     soup = BeautifulSoup(response.content, "lxml")
     divs = soup.findAll("div", class_="definition")
+    words: list[Word] = []
 
-    # For each div extract the informations and put it in the list
-    words = []
-    for contents in (div.contents[0].contents for div in divs):
-        words.append({"url": "https://www.urbandictionary.com" +
-                             contents[0].contents[0].contents[0].attrs["href"],
-                      "name": _get_string_from_div(contents[0], markdown),
-                      "meaning": _get_string_from_div(contents[1], markdown),
-                      "example": _get_string_from_div(contents[2], markdown),
-                      "contributor": _get_string_from_div(contents[3], markdown)})
+    # Foreach definition div extract the Word and append it to the list
+    for div in divs:
+        word_divs = div.contents[0].contents
+        word = Word(url="https://www.urbandictionary.com" +
+                        word_divs[0].contents[0].contents[0].attrs["href"],
+                    name=get_string_from_div(word_divs[0], markdown),
+                    meaning=get_string_from_div(word_divs[1], markdown),
+                    example=get_string_from_div(word_divs[2], markdown),
+                    contributor=get_string_from_div(word_divs[3], markdown))
+        words.append(word)
     return words
+
+class Word():
+    """
+    A class describing a word definition from www.urbandictionary.com
+    """
+
+    def __init__(
+                 self,
+                 url: str,
+                 name: str,
+                 meaning: str,
+                 example: str,
+                 contributor: str,
+                 voting : tuple = (0,0)):
+        self.url = url
+        self.name = name
+        self.meaning = meaning
+        self.example = example
+        self.contributor = contributor
+        self.voting = voting
+
+    def __eq__(self, __o: object) -> bool:
+        try:
+            return (self.url == __o.url and
+                    self.name == __o.name and
+                    self.meaning == __o.meaning and
+                    self.example == __o.example)
+        except AttributeError:
+            return False
 
 
 class UrbanDictionary():
-    """A class to handle queries on https://www.urbandictionary.com/"""
+    """A class to handle queries on www.urbandictionary.com"""
 
-    def __init__(self,
+    def __init__(
+                self,
                 query: str = None,
                 random: bool = False,
                 markdown: bool = False,
@@ -89,12 +155,12 @@ class UrbanDictionary():
         else:
             self.query = None
             self.random = random
-        self.is_markdown_enabled = markdown
-        self.is_caching_enabled = caching
+        self.is_markdown = markdown
+        self.is_caching = caching
         self.word_index = 0
         self.page_index = 1
-        self.page = get_words_from_url(self.url, self.is_markdown_enabled)
-        self.pages = {self.page_index: self.page} if self.is_caching_enabled else {}
+        self.page = get_words_from_url(self.url, self.is_markdown)
+        self.pages = {self.page_index: self.page} if self.is_caching else {}
 
     @property
     def url(self):
@@ -109,9 +175,9 @@ class UrbanDictionary():
 
     @property
     def current_word(self):
-        if self.page:
+        try:
             return self.page[self.word_index]
-        else:
+        except IndexError:
             return None
 
     @property
@@ -126,8 +192,8 @@ class UrbanDictionary():
     def has_next_page(self):
         self.page_index += 1
         words = (self.pages.get(self.page_index) or
-                 get_words_from_url(self.url, self.is_markdown_enabled))
-        if self.is_caching_enabled:
+                 get_words_from_url(self.url, self.is_markdown))
+        if self.is_caching:
             self.pages[self.page_index] = words
         self.page_index -= 1
         return self.random or len(words) > 0
@@ -143,7 +209,7 @@ class UrbanDictionary():
         self.word_index = 0
         self.page_index -= 1
         self.page = (self.pages.get(self.page_index) or
-                     get_words_from_url(self.url, self.is_markdown_enabled))
+                     get_words_from_url(self.url, self.is_markdown))
         return self.page
 
     def go_to_previous_word(self):
@@ -164,7 +230,7 @@ class UrbanDictionary():
         self.word_index = 0
         self.page_index += 1
         self.page = (self.pages.get(self.page_index) or
-                     get_words_from_url(self.url, self.is_markdown_enabled))
+                     get_words_from_url(self.url, self.is_markdown))
         return self.page
 
     def go_to_next_word(self):
