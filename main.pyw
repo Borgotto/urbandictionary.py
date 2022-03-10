@@ -18,10 +18,10 @@ layout = [
      sg.Button(">", key="nextWord", tooltip="next word", size=(20,1), disabled = not ud.has_next_word),
      sg.Button(">>", key="nextPage", tooltip="next page", size=(20,1), disabled = not ud.has_next_page),
     ],
-    [sg.Text(ud.current_word["name"],key="name",font=(None,12,"bold"),size=(50,None), tooltip="word")],
-    [sg.Text(ud.current_word["meaning"],key="meaning",size=(100,None), tooltip="meaning")],
-    [sg.Text(ud.current_word["example"],key="example",font=(None,10,"italic"),size=(100,None), tooltip="example")],
-    [sg.Text(ud.current_word["contributor"],key="contributor",size=(100,None), tooltip="contributor", pad=((5,5),(5,15)))]
+    [sg.Text(ud.word.name,key="name",font=(None,12,"bold"),size=(50,None), tooltip="word")],
+    [sg.Text(ud.word.meaning,key="meaning",size=(100,None), tooltip="meaning")],
+    [sg.Text(ud.word.example,key="example",font=(None,10,"italic"),size=(100,None), tooltip="example")],
+    [sg.Text(ud.word.contributor,key="contributor",size=(100,None), tooltip="contributor", pad=((5,5),(5,15)))]
 ]
 window = sg.Window('Urban Dictionary', layout, finalize=True)
 
@@ -38,7 +38,7 @@ while True:
     elif event == "search":
         if values.get("query").replace("\n"," "):
             query = UrbanDictionary(values.get("query").replace("\n"," "))
-            if query.current_word:
+            if query.word:
                 ud = query
             else:
                 sg.popup("Sorry, we couldn't find: " + values.get('query').replace('\n', ' '), title="¯\\_(ツ)_/¯")
@@ -58,11 +58,11 @@ while True:
         ud.go_to_next_page()
 
     # update UI elements
-    word = ud.current_word
-    window["name"].update(word["name"])
-    window["meaning"].update(word["meaning"])
-    window["example"].update(word["example"])
-    window["contributor"].update(word["contributor"])
+    word = ud.word
+    window["name"].update(word.name)
+    window["meaning"].update(word.meaning)
+    window["example"].update(word.example)
+    window["contributor"].update(word.contributor)
     window["previousPage"].update(disabled = not ud.has_previous_page)
     window["previousWord"].update(disabled = not ud.has_previous_word)
     window["nextWord"].update(disabled = not ud.has_next_word)
