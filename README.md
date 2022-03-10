@@ -30,19 +30,16 @@ from urban_dictionary import UrbanDictionary
 
 ud = UrbanDictionary()
 
-# Simply get the words from the main page
-ud = UrbanDictionary()
-
 word_of_the_day = ud.current_word
-print("Today's WOTD is", word_of_the_day.get("name"))
+print("Today's WOTD is", word_of_the_day.name)
 
 if ud.has_next_word:
     word = ud.go_to_next_word()
-    print("Yesterday's WOTD was", word.get("name"))
+    print("Yesterday's WOTD was", word.name)
 
 if ud.has_next_page:
     ud.go_to_next_page()
-    print("Last week's WOTD was", ud.current_word.get("name"))
+    print("Last week's WOTD was", ud.current_word.name, end="\n\n")
 ```
 - #### search for specific words
 ```python
@@ -53,7 +50,7 @@ if ud.current_word is None:
     print("no definition")
 else:
     print("Top definition for 'meaning of life' is:\n" +
-          ud.current_word.get("meaning"))
+          ud.current_word.meaning, end="\n\n")
 ```
 - #### you can also get random words
 ```python
@@ -61,14 +58,14 @@ ud = UrbanDictionary(random=True)
 
 # There's always going to be a word to get, no checks needed
 print("Feeling lucky? Here's a random word:\n" +
-      ud.current_word.get("name") + "\n" +
-      ud.current_word.get("example"))
+      ud.current_word.name + "\n" +
+      ud.current_word.example, end="\n\n")
 
 # Let's get another random page full of random words
 ud.go_to_previous_page()
-print("\n\nAnother random word:\n" +
-      ud.current_word.get("name") + "\n" +
-      ud.current_word.get("example"))
+print("Another random word:\n" +
+      ud.current_word.name + "\n" +
+      ud.current_word.example, end="\n\n")
 ```
 
 ###### please, please, please send feedback
