@@ -1,6 +1,22 @@
-"""TODO Docstring
-soon™
 """
+urbandictionary.py
+------------------------
+A web scraper written in Python to extract words from
+https://www.urbandictionary.com/
+
+It allows you to query the main page to get the Word Of The Day(s),
+search for specific definitions or get completely random words.
+
+This module supports markdown syntax for the words so you can pretty
+print them
+
+You can use this module as you'd use the website, you can move from page
+to page and/or single words with the UrbanDictionary class functions.
+
+To actually read the words and their definition, example, author you may
+want to look at the Word class attributes
+"""
+
 
 __author__ = "Emanuele Borghini"
 __version__ = "0.1"
@@ -41,7 +57,7 @@ def get_string_from_div(div: element.Tag, markdown: bool = False):
 
     N.B.
     -------------
-    this function is highly dependant from
+    this function is highly dependant on
     https://www.urbandictionary.com/ html page
     """
 
@@ -82,7 +98,7 @@ def get_words_from_url(url: str, markdown: bool = False):
 
     N.B.
     -------------
-    this function is highly dependant from
+    this function is highly dependant on
     https://www.urbandictionary.com/ html page
     """
 
@@ -171,7 +187,7 @@ class UrbanDictionary:
         self.is_caching = caching
         self.word_index = 0
         self.page_index = 1
-        self.pages: dict[int,list[Word]] = {}  # empty if not is_caching
+        self.pages: dict[int,list[Word]] = {}  # Empty if not is_caching
 
     @property
     def url(self):
