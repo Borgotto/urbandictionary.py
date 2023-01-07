@@ -224,7 +224,7 @@ class UrbanDictionary:
         -------------
         `StopIteration` in case there isn't a previous page
         """
-        if not self.has_previous_page:
+        if not await self.has_previous_page:
             raise StopIteration("There isn't a Page prior to the current one")
 
         self.word_index = 0
@@ -244,7 +244,7 @@ class UrbanDictionary:
         -------------
         `StopIteration` in case there isn't a previous word or page
         """
-        if not self.has_previous_word:
+        if not await self.has_previous_word:
             raise StopIteration("There isn't a Word prior to the current one")
 
         if self.word_index > 0:
@@ -266,7 +266,7 @@ class UrbanDictionary:
         -------------
         `StopIteration` in case there isn't a next page
         """
-        if not self.has_next_page:
+        if not await self.has_next_page:
             raise StopIteration("There isn't a Page after the current one")
 
         self.word_index = 0
@@ -286,7 +286,7 @@ class UrbanDictionary:
         -------------
         `StopIteration` in case there isn't a next word or page
         """
-        if not self.has_next_word:
+        if not await self.has_next_word:
             raise StopIteration("There isn't a Word after the current one")
 
         if self.word_index < len(await self.page)-1:
@@ -337,10 +337,10 @@ class UrbanDictionary:
         """
         return await self._new_query(self.query_type.WOTD)
 
-async def main():
-    async with UrbanDictionary() as ud:
-        for _ in range(10):
-            random_word = await ud.get_random_word()
-            print(random_word, end="\n\n\n")
+# async def main():
+#     async with UrbanDictionary() as ud:
+#         for _ in range(10):
+#             random_word = await ud.get_random_word()
+#             print(random_word, end="\n\n\n")
 
-asyncio.run(main())
+# asyncio.run(main())
