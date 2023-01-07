@@ -1,8 +1,9 @@
 import re
-import requests
 from urllib.parse import quote
 from datetime import datetime as dt
 from enum import Enum
+import asyncio
+import aiohttp
 
 class Word:
     """
@@ -42,7 +43,7 @@ class Word:
     def __repr__(self):
         return f"Word(definition: {self.definition!r}, date: {self.date!r}, permalink: {self.permalink!r}, thumbs_up: {self.thumbs_up!r}, thumbs_down: {self.thumbs_down!r}, author: {self.author!r}, word: {self.word!r}, defid: {self.defid!r}, current_vote: {self.current_vote!r}, written_on: {self.written_on!r}, example: {self.example!r})"
 
-def get_words_from_url(url: str, markdown: bool = False) -> list[Word]:
+async def get_words_from_url(url: str, markdown: bool = False, session: aiohttp.ClientSession|None = None) -> list[Word]:
     """Utility function to extract the words from any valid url from the
     api.urbandictionary.com endpoints
 
@@ -60,20 +61,18 @@ def get_words_from_url(url: str, markdown: bool = False) -> list[Word]:
     A `list` containing the `Word` objects
     """
 
-    # Static Session object
-    try:
-        session = get_words_from_url.session
-    except AttributeError:
-        session = get_words_from_url.session = requests.Session()
+    # Fetch the json from the url, use the provided session or create a new one
+    s = session or aiohttp.ClientSession()
+    async with s.get(url) as response:
+        json_response = await response.json()
+    if session is None: await s.close()
 
-    # Fetch the json from the url
-    response = session.get(url).json()
-    if response.get('error') or response.get('list') is None:
-        raise Exception(response.get('error') or 'Invalid response')
+    if json_response.get('error') or json_response.get('list') is None:
+        raise Exception(json_response.get('error') or 'Invalid response')
 
     # Create markdown links for the words defined in square brackets
     def _format_markdown(string: str):
-        regex = '\[.*?\]'
+        regex = "\\[.*?\\]"
         transform_func = lambda x: x.group()+f'(https://www.urbandictionary.com/define.php?term={quote(x.group()[1:-1])})' if markdown else x.group()[1:-1]
         return re.sub(regex, transform_func, string)
 
@@ -90,29 +89,24 @@ def get_words_from_url(url: str, markdown: bool = False) -> list[Word]:
             current_vote=word.get('current_vote'),
             written_on=dt.strptime(word['written_on'],'%Y-%m-%dT%H:%M:%S.%fZ'),
             example=_format_markdown(word.get('example',''))
-        ) for word in response['list']]
+        ) for word in json_response['list']]
 
-def auto_complete(query: str) -> list[str]:
+async def auto_complete(query: str) -> list[str]:
     """
     Returns a list of words that auto complete the query, these strings can later be used to query the entire word
     """
-    # Static Session object
-    try:
-        session = auto_complete.session
-    except AttributeError:
-        session = auto_complete.session = requests.Session()
-
     # Fetch the json from the url
-    response = session.get(f'https://api.urbandictionary.com/v0/autocomplete?term={quote(query)}').json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.urbandictionary.com/v0/autocomplete?term={quote(query)}') as response:
+            json_response = await response.json()
+
     try:
-        if response.get('error'):
-            raise Exception(response.get('error') or 'Invalid response')
+        if json_response.get('error'):
+            raise Exception(json_response.get('error') or 'Invalid response')
     except AttributeError:
         pass
 
-    return response
-
-
+    return json_response
 
 class UrbanDictionary:
     """A class to handle queries on https://www.urbandictionary.com/"""
@@ -137,12 +131,19 @@ class UrbanDictionary:
         caching: `bool`
             if true `Word`s will be cached to save time and bandwidth
         """
+        self.session = aiohttp.ClientSession()
         self.is_markdown: bool = markdown
         self.is_caching: bool = caching
         self.query = self.query_type.EMPTY
         self.word_index: int = 0
         self.page_index: int = 0
         self.cached_pages: list[list[Word]] = []  # Empty if not is_caching
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exinfo):
+        await self.session.close()
 
     @property
     def url(self) -> str:
@@ -164,15 +165,15 @@ class UrbanDictionary:
         return base_url + query_str
 
     @property
-    def word(self) -> Word | None:
+    async def word(self) -> Word | None:
         """Returns the current `Word` of the current page"""
         try:
-            return self.page[self.word_index]
+            return (await self.page)[self.word_index]
         except IndexError:
             return None
 
     @property
-    def page(self) -> list[Word]:
+    async def page(self) -> list[Word]:
         """Returns the current page (`list[Word]`)"""
         if self.query == self.query_type.EMPTY:
             return []
@@ -181,7 +182,7 @@ class UrbanDictionary:
         try:
             page = self.cached_pages[self.page_index]
         except IndexError:
-            page = get_words_from_url(self.url, self.is_markdown)
+            page = await get_words_from_url(self.url, self.is_markdown, self.session)
 
         # If caching is enabled, cache the page
         if self.is_caching:
@@ -193,25 +194,25 @@ class UrbanDictionary:
         return page
 
     @property
-    def has_previous_page(self) -> bool:
+    async def has_previous_page(self) -> bool:
         return self.page_index > 0
 
     @property
-    def has_previous_word(self) -> bool:
-        return self.word_index > 0 or self.has_previous_page
+    async def has_previous_word(self) -> bool:
+        return self.word_index > 0 or await self.has_previous_page
 
     @property
-    def has_next_page(self) -> bool:
+    async def has_next_page(self) -> bool:
         self.page_index += 1
-        next_page = self.page
+        next_page = await self.page
         self.page_index -= 1
         return len(next_page) > 0
 
     @property
-    def has_next_word(self) -> bool:
-        return self.word_index < len(self.page)-1 or self.has_next_page
+    async def has_next_word(self) -> bool:
+        return self.word_index < len(await self.page)-1 or await self.has_next_page
 
-    def go_to_previous_page(self) -> list[Word]:
+    async def go_to_previous_page(self) -> list[Word]:
         """
         Move onto the first `Word` of the previous page.
 
@@ -228,9 +229,9 @@ class UrbanDictionary:
 
         self.word_index = 0
         self.page_index -= 1
-        return self.page
+        return await self.page
 
-    def go_to_previous_word(self) -> Word | None:
+    async def go_to_previous_word(self) -> Word | None:
         """
         Move onto the previous `Word` of the current page or last `Word`
         of the previous page
@@ -249,11 +250,11 @@ class UrbanDictionary:
         if self.word_index > 0:
             self.word_index -= 1
         else:
-            self.go_to_previous_page()
-            self.word_index = len(self.page)-1
-        return self.word
+            await self.go_to_previous_page()
+            self.word_index = len(await self.page)-1
+        return await self.word
 
-    def go_to_next_page(self) -> list[Word]:
+    async def go_to_next_page(self) -> list[Word]:
         """
         Move onto the first `Word` of the next page.
 
@@ -270,9 +271,9 @@ class UrbanDictionary:
 
         self.word_index = 0
         self.page_index += 1
-        return self.page
+        return await self.page
 
-    def go_to_next_word(self) -> Word | None:
+    async def go_to_next_word(self) -> Word | None:
         """
         Move onto the next `Word` of the current page or first `Word` of
         the next page
@@ -288,20 +289,20 @@ class UrbanDictionary:
         if not self.has_next_word:
             raise StopIteration("There isn't a Word after the current one")
 
-        if self.word_index < len(self.page)-1:
+        if self.word_index < len(await self.page)-1:
             self.word_index += 1
         else:
-            self.go_to_next_page()
-        return self.word
+            await self.go_to_next_page()
+        return await self.word
 
-    def _new_query(self, type: query_type, query: str = '') -> Word | None:
+    async def _new_query(self, type: query_type, query: str = '') -> Word | None:
         self.query = query if type == self.query_type.WORD else type
         self.page_index = 0
         self.word_index = 0
         self.cached_pages = []
-        return self.word
+        return await self.word
 
-    def get_definition(self, word: str) -> Word | None:
+    async def get_definition(self, word: str) -> Word | None:
         """
         Query for a specific word, a random word or words of the day
 
@@ -314,9 +315,9 @@ class UrbanDictionary:
         -------------------------
         The first `Word` of the first page
         """
-        return self._new_query(self.query_type.WORD, word)
+        return await self._new_query(self.query_type.WORD, word)
 
-    def get_random_word(self) -> Word | None:
+    async def get_random_word(self) -> Word | None:
         """
         Get random words
 
@@ -324,9 +325,9 @@ class UrbanDictionary:
         -------------
         The first `Word` of the first page
         """
-        return self._new_query(self.query_type.RANDOM)
+        return await self._new_query(self.query_type.RANDOM)
 
-    def get_wotd(self) -> Word | None:
+    async def get_wotd(self) -> Word | None:
         """
         Get a page of the words of the day
 
@@ -334,4 +335,12 @@ class UrbanDictionary:
         -------------
         The first `Word` of the first page
         """
-        return self._new_query(self.query_type.WOTD)
+        return await self._new_query(self.query_type.WOTD)
+
+async def main():
+    async with UrbanDictionary() as ud:
+        for _ in range(10):
+            random_word = await ud.get_random_word()
+            print(random_word, end="\n\n\n")
+
+asyncio.run(main())
